@@ -102,6 +102,8 @@ app.use("/api/orders", authenticateJWT, require("./routes/order.routes"));
 app.use("/api/loyalty", authenticateJWT, require("./routes/loyalty.routes"));
 app.use("/api/history", authenticateJWT, require("./routes/orderHistory.routes"));
 app.use("/api/reviews", authenticateJWT, require("./routes/review.routes"));
+app.use("/api/toppings", require("./routes/topping.routes"));
+
 
 // ======================================================
 // 🧑‍💼 ADMIN ROUTES
@@ -185,6 +187,12 @@ app.use(
   require("./routes/admin/admin.transaction.routes")
 );
 app.use("/api/admin/toppings", authenticateJWT, authorizeAdmin, require("./routes/admin/admin.topping.routes"));
+app.use(
+  "/api/admin/topping-recipes",
+  authenticateJWT,
+  authorizeAdmin,
+  require("./routes/admin/admin.toppingRecipe.routes")
+);
 
 // ======================================================
 // 🧠 DEBUG ENDPOINT (Kiểm tra kết nối SQL)

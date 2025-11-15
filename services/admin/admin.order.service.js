@@ -1,67 +1,68 @@
-const { sql, poolPromise } = require("../../config/db");
+const { sql, getPool } = require("../../config/db");
 
 class AdminOrderService {
-  // Lấy danh sách đơn hàng
+  // ✅ Lấy toàn bộ đơn hàng kèm danh sách sản phẩm
   static async getAll() {
-    const pool = await getPool();
-    const res = await pool.request().query(`
-      SELECT 
-        o.Id, o.UserId, u.Name AS CustomerName, u.Email, o.Total, o.Status, 
-        o.PaymentStatus, o.CreatedAt
-      FROM Orders o
-      JOIN Users u ON o.UserId = u.Id
-      ORDER BY o.CreatedAt DESC
-    `);
-    return res.recordset;
-  }
+    try {
+      const pool = await getPool();
 
-  // Lấy chi tiết đơn hàng
-  static async getById(id) {
-    const pool = await getPool();
-    const res = await pool.request()
-      .input("Id", sql.Int, id)
-      .query(`
+      const res = await pool.request().query(`
         SELECT 
-          o.Id, o.Total, o.Status, o.PaymentStatus, o.CreatedAt,
-          u.Name AS CustomerName, u.Email, u.Phone
+          o.Id, o.UserId, u.Name AS CustomerName, u.Phone, o.Total, o.Status, o.CreatedAt,
+          STRING_AGG(
+            CASE 
+              WHEN p.Name IS NOT NULL THEN CONCAT(p.Name, ' (x', oi.Quantity, ')')
+              ELSE '(Sản phẩm không tồn tại)'
+            END, ', '
+          ) AS ProductList
         FROM Orders o
         JOIN Users u ON o.UserId = u.Id
-        WHERE o.Id = @Id
-      `);
-    if (!res.recordset.length) throw new Error("Không tìm thấy đơn hàng");
-
-    const items = await pool.request()
-      .input("OrderId", sql.Int, id)
-      .query(`
-        SELECT oi.*, p.Name AS ProductName
-        FROM OrderItems oi
-        JOIN Products p ON oi.ProductId = p.Id
-        WHERE oi.OrderId = @OrderId
+        LEFT JOIN OrderItems oi ON o.Id = oi.OrderId
+        LEFT JOIN Products p ON oi.ProductId = p.Id
+        GROUP BY o.Id, o.UserId, u.Name, u.Phone, o.Total, o.Status, o.CreatedAt
+        ORDER BY o.CreatedAt DESC
       `);
 
-    return { ...res.recordset[0], Items: items.recordset };
+      console.log("📦 Orders fetched:", res.recordset.length, "đơn hàng");
+      return res.recordset;
+    } catch (err) {
+      console.error("❌ Lỗi khi lấy danh sách đơn hàng:", err);
+      return [];
+    }
   }
 
-  // Cập nhật trạng thái đơn hàng
+  // ✅ Cập nhật trạng thái đơn hàng
   static async updateStatus(orderId, status) {
     const valid = ["pending", "confirmed", "processing", "completed", "cancelled"];
     if (!valid.includes(status)) throw new Error("Trạng thái không hợp lệ");
 
-    const pool = await getPool();
-    await pool.request()
-      .input("Id", sql.Int, orderId)
-      .input("Status", sql.NVarChar, status)
-      .query("UPDATE Orders SET Status=@Status WHERE Id=@Id");
+    try {
+      const pool = await getPool();
+      await pool.request()
+        .input("Id", sql.Int, orderId)
+        .input("Status", sql.NVarChar, status)
+        .query("UPDATE Orders SET Status = @Status WHERE Id = @Id");
 
-    return { message: `✅ Đơn hàng #${orderId} đã cập nhật trạng thái thành ${status}` };
+      return { message: `✅ Đơn hàng #${orderId} đã được cập nhật trạng thái thành "${status}"` };
+    } catch (err) {
+      console.error(`❌ Lỗi cập nhật trạng thái đơn hàng #${orderId}:`, err);
+      throw err;
+    }
   }
 
-  // Xóa đơn hàng (nếu cần)
+  // ✅ Xóa đơn hàng
   static async delete(id) {
-    const pool = await getPool();
-    await pool.request().input("Id", sql.Int, id)
-      .query("DELETE FROM Orders WHERE Id=@Id");
-    return { message: `🗑️ Đã xóa đơn hàng #${id}` };
+    try {
+      const pool = await getPool();
+      await pool.request()
+        .input("Id", sql.Int, id)
+        .query("DELETE FROM Orders WHERE Id = @Id");
+
+      return { message: `🗑️ Đã xóa đơn hàng #${id}` };
+    } catch (err) {
+      console.error(`❌ Lỗi khi xóa đơn hàng #${id}:`, err);
+      throw err;
+    }
   }
 }
 

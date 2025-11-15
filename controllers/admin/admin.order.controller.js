@@ -21,18 +21,21 @@ class AdminOrderController {
 
   static async updateStatus(req, res) {
     try {
-      const { status } = req.body;
-      const result = await AdminOrderService.updateStatus(req.params.id, status);
+      console.log("📥 PATCH status:", req.params.id, req.body.status);
+      const result = await AdminOrderService.updateStatus(req.params.id, req.body.status);
+      console.log("📤 Result:", result);
       res.json(result);
     } catch (err) {
+      console.error("❌ Lỗi updateStatus:", err.message);
       res.status(400).json({ error: err.message });
     }
   }
 
+
   static async delete(req, res) {
     try {
       const result = await AdminOrderService.delete(req.params.id);
-      res.json(result);
+      res.json({ ok: true, ...result });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
