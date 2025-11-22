@@ -2,10 +2,13 @@ const { sql, getPool } = require("../../config/db");
 
 class OrderWorkflowService {
 
+  // ======================================================
+  // CẬP NHẬT TRẠNG THÁI ĐƠN
+  // ======================================================
   async updateStatus(orderId, status) {
     const pool = await getPool();
 
-    // Cập nhật trạng thái đơn
+    // Cập nhật Orders
     await pool.request()
       .input("Id", sql.Int, orderId)
       .input("Status", sql.NVarChar(50), status)
@@ -15,7 +18,7 @@ class OrderWorkflowService {
         WHERE Id = @Id
       `);
 
-    // Ghi vào lịch sử trạng thái
+    // Ghi lịch sử
     await pool.request()
       .input("OrderId", sql.Int, orderId)
       .input("NewStatus", sql.NVarChar(50), status)
@@ -27,11 +30,49 @@ class OrderWorkflowService {
     return true;
   }
 
-  // Tự động trừ kho nguyên liệu khi hoàn thành đơn
+  // ======================================================
+  // BARISTA LẤY DANH SÁCH ĐƠN CẦN PHA CHẾ
+  // ======================================================
+  async getBaristaOrders(storeId = null) {
+    const pool = await getPool();
+
+    const rs = await pool.request().query(`
+      SELECT 
+        o.Id,
+        o.CustomerName,
+        o.Status,
+        o.Type,
+        o.CreatedAt,
+        (
+          SELECT 
+            od.ProductName,
+            od.Size,
+            od.Quantity,
+            od.Notes
+          FROM OrderDetails od
+          WHERE od.OrderId = o.Id
+          FOR JSON PATH
+        ) AS Items
+      FROM Orders o
+      WHERE o.Status IN ('Pending', 'Accepted', 'Making')
+      ORDER BY o.CreatedAt DESC
+    `);
+
+    // Convert JSON
+    const data = rs.recordset.map(o => ({
+      ...o,
+      Items: JSON.parse(o.Items || "[]")
+    }));
+
+    return data;
+  }
+
+  // ======================================================
+  // TỰ ĐỘNG TRỪ KHO KHI HOÀN THÀNH ĐƠN
+  // ======================================================
   async autoDeductIngredients(orderId) {
     const pool = await getPool();
 
-    // Lấy danh sách sản phẩm trong đơn
     const items = await pool.request()
       .input("OrderId", sql.Int, orderId)
       .query(`
@@ -41,6 +82,7 @@ class OrderWorkflowService {
       `);
 
     for (const item of items.recordset) {
+
       const recipe = await pool.request()
         .input("ProductId", sql.Int, item.ProductId)
         .query(`

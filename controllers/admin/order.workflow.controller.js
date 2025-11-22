@@ -26,6 +26,27 @@ class OrderWorkflowController {
     await WorkflowService.autoDeductIngredients(id);
     res.json({ ok: true, status: "Done" });
   }
+
+  // ============================
+  // BARISTA LẤY DANH SÁCH ĐƠN
+  // ============================
+  async getBaristaOrders(req, res) {
+    try {
+      const storeId = req.user.StoreId || null;  // tùy token của bạn
+      const orders = await WorkflowService.getBaristaOrders(storeId);
+
+      return res.json({
+        ok: true,
+        data: orders,
+      });
+    } catch (error) {
+      console.error("[getBaristaOrders] ERROR:", error);
+      return res.status(500).json({
+        ok: false,
+        message: "Lỗi server khi lấy danh sách đơn cho Barista",
+      });
+    }
+  }
 }
 
 module.exports = new OrderWorkflowController();

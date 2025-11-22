@@ -26,16 +26,10 @@ function authenticateJWT(req, res, next) {
 
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    if (!decoded || !decoded.role)
-      return res.status(401).json({ error: "Invalid token payload" });
-
-    req.user = decoded; // { id, email, role }
+    req.user = decoded;  // { id, email, role? }
 
     next();
   } catch (err) {
-    if (err.name === "TokenExpiredError")
-      return res.status(401).json({ error: "Token expired" });
-
     return res.status(401).json({ error: "Unauthorized token" });
   }
 }

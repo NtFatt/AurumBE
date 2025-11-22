@@ -1,22 +1,39 @@
 const express = require("express");
 const router = express.Router();
-const { authenticateJWT, authorizeAdmin } = require("../../middleware/auth.middleware");
+
+const { authenticateJWT } = require("../../middleware/auth.middleware");
+const { authorizeEmployee } = require("../../middleware/employee.middleware");
 const WorkflowController = require("../../controllers/admin/order.workflow.controller");
 
-// Bảo vệ route
+// bắt buộc login
 router.use(authenticateJWT);
-router.use(authorizeAdmin);
 
-// Cashier nhận đơn
-router.patch("/:id/accept", WorkflowController.accept);
+// BARISTA lấy đơn
+router.get(
+  "/barista-orders",
+  authorizeEmployee(["barista", "admin"]),
+  WorkflowController.getBaristaOrders
+);
 
-// Cashier gửi sang barista
-router.patch("/:id/to-making", WorkflowController.toMaking);
+// CASHIER gửi đơn sang Barista
+router.patch(
+  "/:id/to-making",
+  authorizeEmployee(["cashier", "admin"]),
+  WorkflowController.toMaking
+);
 
-// Barista hoàn thành pha chế
-router.patch("/:id/complete-by-barista", WorkflowController.completeByBarista);
+// BARISTA hoàn tất
+router.patch(
+  "/:id/complete-by-barista",
+  authorizeEmployee(["barista", "admin"]),
+  WorkflowController.completeByBarista
+);
 
-// Cashier chốt đơn & trừ kho
-router.patch("/:id/done", WorkflowController.done);
+// CASHIER chốt đơn
+router.patch(
+  "/:id/done",
+  authorizeEmployee(["cashier", "admin"]),
+  WorkflowController.done
+);
 
 module.exports = router;
