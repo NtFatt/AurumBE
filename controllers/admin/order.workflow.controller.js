@@ -2,43 +2,88 @@ const WorkflowService = require("../../services/admin/order.workflow.service");
 
 class OrderWorkflowController {
 
+  // ============================
+  // CASHIER / BARISTA ACTIONS
+  // ============================
   async accept(req, res) {
-    const id = req.params.id;
-    const result = await WorkflowService.updateStatus(id, "Accepted");
-    res.json({ ok: true, status: "Accepted", result });
+    try {
+      const id = req.params.id;
+const result = await WorkflowService.updateStatus(id, "waiting");
+
+      return res.json({
+        ok: true,
+        status: "Accepted",
+        data: result
+      });
+    } catch (error) {
+      console.error("[accept] ERROR:", error);
+      return res.status(500).json({ ok: false, message: "Không thể cập nhật trạng thái." });
+    }
   }
 
   async toMaking(req, res) {
-    const id = req.params.id;
-    const result = await WorkflowService.updateStatus(id, "Making");
-    res.json({ ok: true, status: "Making", result });
+    try {
+      const id = req.params.id;
+const result = await WorkflowService.updateStatus(id, "preparing");
+
+      return res.json({
+        ok: true,
+        status: "Making",
+        data: result
+      });
+    } catch (error) {
+      console.error("[toMaking] ERROR:", error);
+      return res.status(500).json({ ok: false, message: "Không thể cập nhật trạng thái." });
+    }
   }
 
   async completeByBarista(req, res) {
-    const id = req.params.id;
-    const result = await WorkflowService.updateStatus(id, "CompletedByBarista");
-    res.json({ ok: true, status: "CompletedByBarista", result });
+    try {
+      const id = req.params.id;
+const result = await WorkflowService.updateStatus(id, "done");
+
+      return res.json({
+        ok: true,
+        status: "CompletedByBarista",
+        data: result
+      });
+    } catch (error) {
+      console.error("[completeByBarista] ERROR:", error);
+      return res.status(500).json({ ok: false, message: "Không thể cập nhật trạng thái." });
+    }
   }
 
   async done(req, res) {
-    const id = req.params.id;
-    await WorkflowService.updateStatus(id, "Done");
-    await WorkflowService.autoDeductIngredients(id);
-    res.json({ ok: true, status: "Done" });
+    try {
+      const id = req.params.id;
+
+await WorkflowService.updateStatus(id, "done");
+      await WorkflowService.autoDeductIngredients(id);
+
+      return res.json({
+        ok: true,
+        status: "Done"
+      });
+    } catch (error) {
+      console.error("[done] ERROR:", error);
+      return res.status(500).json({ ok: false, message: "Không thể hoàn thành đơn." });
+    }
   }
 
   // ============================
-  // BARISTA LẤY DANH SÁCH ĐƠN
+  // BARISTA: LẤY DANH SÁCH ĐƠN
   // ============================
   async getBaristaOrders(req, res) {
     try {
-      const storeId = req.user.StoreId || null;  // tùy token của bạn
+      const storeId = req.user?.StoreId || null;
+
       const orders = await WorkflowService.getBaristaOrders(storeId);
 
       return res.json({
         ok: true,
         data: orders,
       });
+
     } catch (error) {
       console.error("[getBaristaOrders] ERROR:", error);
       return res.status(500).json({

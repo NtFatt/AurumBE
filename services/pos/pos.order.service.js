@@ -21,7 +21,7 @@ static async getCashierOrders(user) {
             u.Name AS CustomerName
         FROM Orders o
         LEFT JOIN Users u ON o.UserId = u.Id
-        WHERE o.Status IN ('pending', 'waiting')
+WHERE o.Status IN ('pending','waiting','done')
         ORDER BY o.CreatedAt DESC
     `);
 
@@ -30,18 +30,23 @@ static async getCashierOrders(user) {
     if (orders.length === 0) return [];
 
     // 2. Lấy danh sách items của tất cả order
-    const itemsRs = await pool.request().query(`
-        SELECT 
-            oi.OrderId,
-            oi.ProductId,
-            oi.Quantity,
-            oi.Price,
-            p.Name AS ProductName,
-            p.ImageUrl
-        FROM OrderItems oi
-        JOIN Products p ON oi.ProductId = p.Id
-        WHERE oi.OrderId IN (${orders.map(o => o.Id).join(",")})
-    `);
+const itemsRs = await pool.request().query(`
+    SELECT 
+        od.OrderId,
+        od.ProductId,
+        od.Quantity,
+        od.UnitPrice AS Price,
+        od.Size,
+        od.Toppings,
+        od.Sugar,
+        od.Ice,
+        p.Name AS ProductName,
+        p.ImageUrl
+    FROM OrderDetails od
+    JOIN Products p ON od.ProductId = p.Id
+    WHERE od.OrderId IN (${orders.map(o => o.Id).join(",")})
+`);
+
 
     const items = itemsRs.recordset;
 console.log(">>> ORDER ITEMS:", items);

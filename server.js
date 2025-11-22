@@ -18,6 +18,7 @@ const logger = require("./utils/logger");
 const { authenticateJWT, authorizeAdmin } = require("./middleware/auth.middleware");
 const { apiLimiter, loginLimiter } = require("./middleware/rateLimiter");
 const { getPool } = require("./config/db");
+const { authenticateEmployeeJWT } = require("./middleware/employee.middleware");
 
 // ✅ Cron job dọn refresh token hết hạn
 require("./jobs/cleanupTokens");
@@ -200,9 +201,9 @@ app.use(
 
 // ✅ Order workflow management (Cashier & Barista)
 app.use(
-  "/api/workflow",
-  authenticateJWT,
-  require("./routes/admin/order.workflow.routes")   // file vẫn giữ nguyên
+  "/api/admin/workflow",
+  authenticateEmployeeJWT,
+  require("./routes/admin/order.workflow.routes")
 );
 
 

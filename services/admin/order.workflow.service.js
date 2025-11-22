@@ -2,13 +2,9 @@ const { sql, getPool } = require("../../config/db");
 
 class OrderWorkflowService {
 
-  // ======================================================
-  // CẬP NHẬT TRẠNG THÁI ĐƠN
-  // ======================================================
   async updateStatus(orderId, status) {
     const pool = await getPool();
 
-    // Cập nhật Orders
     await pool.request()
       .input("Id", sql.Int, orderId)
       .input("Status", sql.NVarChar(50), status)
@@ -18,7 +14,6 @@ class OrderWorkflowService {
         WHERE Id = @Id
       `);
 
-    // Ghi lịch sử
     await pool.request()
       .input("OrderId", sql.Int, orderId)
       .input("NewStatus", sql.NVarChar(50), status)
@@ -30,46 +25,54 @@ class OrderWorkflowService {
     return true;
   }
 
-  // ======================================================
-  // BARISTA LẤY DANH SÁCH ĐƠN CẦN PHA CHẾ
-  // ======================================================
-  async getBaristaOrders(storeId = null) {
-    const pool = await getPool();
+  // ===============================
+  // BARISTA LẤY ĐƠN
+  // ===============================
+  // ===============================
+  // BARISTA LẤY ĐƠN
+  // ===============================
+async getBaristaOrders() {
+  const pool = await getPool();
 
-    const rs = await pool.request().query(`
+  const rs = await pool.request().query(`
       SELECT 
         o.Id,
-        o.CustomerName,
+        o.UserId,
+        o.Total,
         o.Status,
-        o.Type,
+        o.PaymentStatus,
         o.CreatedAt,
+
         (
           SELECT 
-            od.ProductName,
-            od.Size,
+            p.Name AS ProductName,
             od.Quantity,
-            od.Notes
+            od.UnitPrice AS Price,
+            od.Size,
+            od.Toppings,
+            od.Sugar,
+            od.Ice
           FROM OrderDetails od
+          JOIN Products p ON p.Id = od.ProductId
           WHERE od.OrderId = o.Id
           FOR JSON PATH
         ) AS Items
+
       FROM Orders o
-      WHERE o.Status IN ('Pending', 'Accepted', 'Making')
-      ORDER BY o.CreatedAt DESC
-    `);
+      WHERE o.Status IN ('waiting','preparing')
+      ORDER BY o.CreatedAt ASC
+  `);
 
-    // Convert JSON
-    const data = rs.recordset.map(o => ({
-      ...o,
-      Items: JSON.parse(o.Items || "[]")
-    }));
+  return rs.recordset.map(o => ({
+    ...o,
+    Items: JSON.parse(o.Items || "[]")
+  }));
+}
 
-    return data;
-  }
 
-  // ======================================================
-  // TỰ ĐỘNG TRỪ KHO KHI HOÀN THÀNH ĐƠN
-  // ======================================================
+  // ===============================
+  // TRỪ KHO
+  // ===============================
   async autoDeductIngredients(orderId) {
     const pool = await getPool();
 
@@ -82,7 +85,6 @@ class OrderWorkflowService {
       `);
 
     for (const item of items.recordset) {
-
       const recipe = await pool.request()
         .input("ProductId", sql.Int, item.ProductId)
         .query(`
