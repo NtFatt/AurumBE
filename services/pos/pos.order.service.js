@@ -225,24 +225,24 @@ class PosOrderService {
     static async payOrder(orderId, paymentMethod, customerPaid, user) {
         const pool = await getPool();
 
-        // 1. Kiểm tra đơn hàng
+        // 1. Lấy thông tin đơn hàng
         const rs = await pool.request()
             .input("OrderId", sql.Int, orderId)
             .query(`
-                SELECT Id, Total, PaymentStatus, Status
-                FROM Orders
-                WHERE Id = @OrderId
-            `);
+            SELECT Id, Total, PaymentStatus, Status
+            FROM Orders
+            WHERE Id = @OrderId
+        `);
 
         const order = rs.recordset[0];
         if (!order) throw new Error("Order không tồn tại");
         if (order.PaymentStatus === "paid") throw new Error("Order đã thanh toán");
 
-        // 2. Tính toán tiền
-        const total = parseFloat(order.Total);
-        const paid = parseFloat(customerPaid);
+        // 2. Kiểm tra số tiền
+        const total = Number(order.Total);
+        const paid = Number(customerPaid);
 
-        if (isNaN(total) || isNaN(paid) || total <= 0) {
+        if (isNaN(total) || isNaN(paid)) {
             throw new Error("Dữ liệu thanh toán không hợp lệ.");
         }
         if (paid < total) {
@@ -250,34 +250,29 @@ class PosOrderService {
         }
 
         const change = paid - total;
-        const oldStatus = order.Status;
 
-        // 3. Cập nhật DB (Thanh toán + Hoàn tất đơn hàng)
-        const paidFixed = paid.toFixed(2);
-        const changeFixed = change.toFixed(2);
-
+        // 3. UPDATE trạng thái thanh toán + trạng thái order
         await pool.request()
             .input("OrderId", sql.Int, orderId)
             .input("PaymentMethod", sql.NVarChar, paymentMethod || "cash")
-            .input("AmountPaid", sql.Decimal(18, 2), paidFixed)
-            .input("ChangeAmount", sql.Decimal(18, 2), changeFixed)
-            .input("PaymentStatus", sql.NVarChar, "paid")
-            .input("NewStatus", sql.NVarChar(50), "completed")
-            .input("OldStatus", sql.NVarChar(50), oldStatus)
+            .input("AmountPaid", sql.Decimal(18, 2), paid)
+            .input("ChangeAmount", sql.Decimal(18, 2), change)
+            .input("OldStatus", sql.NVarChar(50), order.Status)
             .query(`
-                UPDATE Orders
-                SET PaymentMethod = @PaymentMethod,
-                    AmountPaid = @AmountPaid,
-                    ChangeAmount = @ChangeAmount,
-                    PaymentStatus = @PaymentStatus,
-                    Status = @NewStatus
-                WHERE Id = @OrderId;
+            UPDATE Orders
+            SET 
+                PaymentMethod = @PaymentMethod,
+                AmountPaid = @AmountPaid,
+                ChangeAmount = @ChangeAmount,
+                PaymentStatus = 'paid',
+                Status = 'completed'   -- ✔ QUAN TRỌNG
+            WHERE Id = @OrderId;
 
-                INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus, ChangedAt)
-                VALUES (@OrderId, @OldStatus, @NewStatus, GETDATE());
-            `);
+            INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus, ChangedAt)
+            VALUES (@OrderId, @OldStatus, 'completed', GETDATE());
+        `);
 
-        // 4. Trừ kho
+        // 4. Gọi inventory
         await PosInventoryService.handleOrderPaid(orderId);
 
         return {

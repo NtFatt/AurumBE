@@ -1,6 +1,7 @@
 const { sql, getPool } = require("../../config/db");
 
 class WorkflowService {
+
   async updateStatus(orderId, status) {
     const pool = await getPool();
 
@@ -26,69 +27,66 @@ class WorkflowService {
   async getBaristaOrders(storeId) {
     const pool = await getPool();
 
+    const qs = `
+      SELECT 
+        o.Id AS OrderId,
+        o.OrderNumber,
+        o.Total,
+        o.Status,
+        o.CreatedAt,
+
+        od.Id AS DetailId,
+        od.Quantity,
+        od.UnitPrice,
+
+        p.Name AS ProductName
+      FROM Orders o
+      JOIN OrderDetails od ON o.Id = od.OrderId
+      JOIN Products p ON od.ProductId = p.Id
+      WHERE o.Status IN ('waiting', 'preparing', 'brewing')
+        AND (@storeId IS NULL OR o.StoreId = @storeId)
+      ORDER BY o.CreatedAt DESC
+    `;
     const rs = await pool.request()
       .input("storeId", storeId)
-      .query(`
-        SELECT 
-          o.Id,
-          o.OrderNumber,
-          o.Total,
-          o.Status,
-          o.CreatedAt,
+      .query(qs);
 
-          od.Id AS DetailId,
-          od.Quantity,
-          od.UnitPrice,
-
-          p.Name AS ProductName,
-          -- od.SizeName AS SizeName, -- nếu trong OrderDetails có field này thì dùng
-
-          (
-            SELECT t.Name
-            FROM OrderToppings ot
-            JOIN Toppings t ON ot.ToppingId = t.Id
-            WHERE ot.OrderDetailId = od.Id
-            FOR JSON PATH
-          ) AS Toppings
-
-        FROM Orders o
-        JOIN OrderDetails od ON o.Id = od.OrderId
-        JOIN Products p ON od.ProductId = p.Id
-        -- JOIN ProductSizes s ON od.SizeId = s.Id  -- ❌ BỎ ĐI
-
-        WHERE o.Status IN ('waiting', 'preparing', 'brewing')
-          AND (@storeId IS NULL OR o.StoreId = @storeId)
-
-        ORDER BY o.CreatedAt DESC
-      `);
 
     const raw = rs.recordset;
     const orders = {};
 
-    raw.forEach(r => {
-      if (!orders[r.Id]) {
-        orders[r.Id] = {
-          id: r.Id,
+    raw.forEach((r, index) => {
+      console.log(`-------------------------------------------`);
+      console.log(`🔍 DÒNG ${index + 1}:`, r);
+      console.log("OrderId =", r.OrderId, "| DetailId =", r.DetailId);
+
+      if (!orders[r.OrderId]) {
+        console.log(`➕ Tạo order mới trong map: OrderId = ${r.OrderId}`);
+
+        orders[r.OrderId] = {
+          id: r.OrderId,
           orderNumber: r.OrderNumber,
           total: r.Total,
-          status: r.Status.toLowerCase(),
+          status: r.Status?.toLowerCase() || "unknown",
           createdAt: r.CreatedAt,
           items: []
         };
       }
 
-      orders[r.Id].items.push({
+      console.log(`📌 Đẩy item: ProductName = ${r.ProductName}`);
+
+      orders[r.OrderId].items.push({
+        id: r.DetailId, // ghi log rõ để kiểm tra undefined
         name: r.ProductName,
-        size: null, // hoặc r.SizeName nếu bạn có cột này
+        size: null,
         quantity: r.Quantity,
         price: r.UnitPrice,
-        toppings: r.Toppings
-          ? JSON.parse(r.Toppings).map(t => t.Name)
-          : []
+        toppings: []
       });
     });
 
-    return Object.values(orders);
+    const finalResult = Object.values(orders);
+    return finalResult;
   }
 }
 
