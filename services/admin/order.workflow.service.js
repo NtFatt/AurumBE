@@ -40,6 +40,8 @@ class WorkflowService {
         od.UnitPrice,
 
         p.Name AS ProductName
+        , o.FulfillmentMethod
+
       FROM Orders o
       JOIN OrderDetails od ON o.Id = od.OrderId
       JOIN Products p ON od.ProductId = p.Id
@@ -56,24 +58,21 @@ class WorkflowService {
     const orders = {};
 
     raw.forEach((r, index) => {
-      console.log(`-------------------------------------------`);
-      console.log(`🔍 DÒNG ${index + 1}:`, r);
-      console.log("OrderId =", r.OrderId, "| DetailId =", r.DetailId);
-
       if (!orders[r.OrderId]) {
-        console.log(`➕ Tạo order mới trong map: OrderId = ${r.OrderId}`);
-
         orders[r.OrderId] = {
           id: r.OrderId,
           orderNumber: r.OrderNumber,
           total: r.Total,
           status: r.Status?.toLowerCase() || "unknown",
           createdAt: r.CreatedAt,
+
+          fulfillmentMethod: r.FulfillmentMethod || "AtStore",
+
           items: []
         };
       }
 
-      console.log(`📌 Đẩy item: ProductName = ${r.ProductName}`);
+
 
       orders[r.OrderId].items.push({
         id: r.DetailId, // ghi log rõ để kiểm tra undefined

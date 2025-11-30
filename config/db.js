@@ -19,6 +19,17 @@ const DB_PASSWORD = process.env.DB_PASSWORD?.trim() || "phuclong_pass";
 const DB_PORT = process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 1433;
 const DB_INSTANCE = process.env.DB_INSTANCE?.trim() || null;
 
+// =============================================================
+// 📌 DEBUG KIỂM TRA BE ĐANG KẾT NỐI DATABASE NÀO
+// =============================================================
+console.log(">>> ACTIVE DATABASE FROM ENV =", {
+  DB_SERVER,
+  DB_NAME,
+  DB_USER,
+  DB_PORT,
+  DB_INSTANCE
+});
+
 // Chuẩn hóa tên server
 if (DB_SERVER === "(local)" || DB_SERVER.toLowerCase() === "local") {
   DB_SERVER = "localhost";

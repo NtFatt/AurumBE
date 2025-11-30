@@ -18,10 +18,12 @@ class OrderService {
     } = orderData;
     const paidOnline = Boolean(isOnlinePaid);
 
-    let finalStatus = paidOnline ? "Completed" : "Pending";
+    // Mặc định: nếu thanh toán online thì đơn vẫn chỉ "Pending" (chưa pha chế xong)
+    let finalStatus = "Pending";
     let paymentStatus = paidOnline ? "Paid" : "Unpaid";
     let amountPaid = paidOnline ? total : 0;
     let changeAmount = 0;
+
 
     console.log("📦 Dữ liệu sản phẩm đầu vào từ FE (Item mẫu):", items[0]);
 
@@ -43,7 +45,7 @@ class OrderService {
         .input("Total", sql.Decimal(18, 2), total)
         // ----------------------------------------------------
         .input("PaymentMethod", sql.NVarChar(50), paymentMethod || "COD")
-        .input("FulfillmentMethod", sql.NVarChar(50), pickupMethod || "Delivery")
+        .input("FulfillmentMethod", sql.NVarChar(50), fulfillmentMethod || pickupMethod || "Delivery")
         .input("DeliveryAddress", sql.NVarChar(255), shippingAddress || null)
         .input("DeliveryLat", sql.Float, lat || null)
         .input("DeliveryLng", sql.Float, lng || null)
@@ -118,18 +120,34 @@ class OrderService {
 
 
       // 3️⃣ Ghi vào lịch sử trạng thái (Pending)
+      // 3️⃣ Ghi vào lịch sử trạng thái ban đầu (Pending)
       await new sql.Request(transaction)
         .input("OrderId", sql.Int, orderId)
         .input("OldStatus", sql.NVarChar(50), null)
-        .input("NewStatus", sql.NVarChar(50), finalStatus)
+        .input("NewStatus", sql.NVarChar(50), finalStatus) // finalStatus = 'Pending'
         .query(`
           INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus)
           VALUES (@OrderId, @OldStatus, @NewStatus)
         `);
 
+      // 🔄 AUTO ĐẨY ĐƠN DELIVERY SANG HÀNG ĐỢI PHA (waiting)
+      if (fulfillmentMethod === "Delivery") {
+        await new sql.Request(transaction)
+          .input("OrderId", sql.Int, orderId)
+          .query(`
+            UPDATE Orders
+            SET Status = 'waiting'
+            WHERE Id = @OrderId;
+
+            INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus)
+            VALUES (@OrderId, 'Pending', 'waiting');
+          `);
+      }
+
       await transaction.commit();
       console.log("✅ Transaction commit thành công!");
       return { orderId };
+
     } catch (err) {
       // ======================================================
       // 🛑 BẮT LỖI CHI TIẾT KHI TẠO ĐƠN HÀNG
