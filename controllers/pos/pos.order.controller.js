@@ -90,57 +90,64 @@ class PosOrderController {
     // ===============================
     // PAY ORDER
     // ===============================
-    static async payOrder(req, res) {
-        try {
-            // 1. Parse orderId
-            const orderId = parseInt(req.params.orderId, 10);
+// ===============================
+// PAY ORDER
+// ===============================
+static async payOrder(req, res) {
+    try {
+        const orderId = parseInt(req.params.orderId, 10);
 
-            // 2. Lấy payload – hỗ trợ cả camelCase và PascalCase
-            //    FE cũ:  { PaymentMethod, AmountPaid }
-            //    FE mới: { paymentMethod, customerPaid }
-            const paymentMethod =
-                req.body.paymentMethod || req.body.PaymentMethod || null;
+        const paymentMethod =
+            req.body.paymentMethod || req.body.PaymentMethod || null;
 
-            const customerPaid =
-                req.body.customerPaid ?? req.body.AmountPaid ?? null;
+        const customerPaid =
+            req.body.customerPaid ?? req.body.AmountPaid ?? null;
 
-            // Debug thêm nếu cần
-            console.log(">>> [PAY ORDER] body =", req.body);
-            console.log(">>> [PAY ORDER] paymentMethod =", paymentMethod, "customerPaid =", customerPaid);
+        console.log(">>> [PAY ORDER] body =", req.body);
+        console.log(">>> [PAY ORDER] paymentMethod =", paymentMethod, "customerPaid =", customerPaid);
 
-            // 3. Validate orderId
-            if (isNaN(orderId)) {
-                return res
-                    .status(400)
-                    .json({ success: false, error: "ID đơn hàng không hợp lệ." });
-            }
+        // NEW LOG — cực quan trọng
+        console.log(">>> [PAY ORDER] CALL SERVICE WITH:", {
+            orderId,
+            paymentMethod,
+            customerPaid,
+            userId: req.user?.id
+        });
 
-            // 4. Validate payload
-            if (!paymentMethod || customerPaid === undefined || customerPaid === null) {
-                return res
-                    .status(400)
-                    .json({ success: false, error: "Thiếu phương thức hoặc số tiền thanh toán." });
-            }
-
-            // 5. Gọi service
-            const data = await PosOrderService.payOrder(
-                orderId,
-                paymentMethod,
-                customerPaid,
-                req.user
-            );
-
-            return res.json({
-                success: true,
-                data,
-            });
-        } catch (err) {
-            console.error(">>> [PAY ORDER ERROR]", err);
+        if (isNaN(orderId)) {
             return res
                 .status(400)
-                .json({ success: false, error: err.message });
+                .json({ success: false, error: "ID đơn hàng không hợp lệ." });
         }
+
+        if (!paymentMethod || customerPaid === undefined || customerPaid === null) {
+            return res
+                .status(400)
+                .json({ success: false, error: "Thiếu phương thức hoặc số tiền thanh toán." });
+        }
+
+        const data = await PosOrderService.payOrder(
+            orderId,
+            paymentMethod,
+            customerPaid,
+            req.user
+        );
+
+        return res.json({
+            success: true,
+            data,
+        });
+    } catch (err) {
+        console.error(">>> [PAY ORDER ERROR] FULL ERROR =", {
+            message: err.message,
+            stack: err.stack
+        });
+
+        return res.status(400).json({ success: false, error: err.message });
     }
+}
+
+
 
     // ===============================
     // CANCEL ORDER
