@@ -403,11 +403,11 @@ VALUES
             SET 
                 PaymentMethod = @PaymentMethod,
                 PaymentStatus = 'paid',
-                Status = 'completed'   -- ✔ QUAN TRỌNG
+                Status = 'waiting'   
             WHERE Id = @OrderId;
 
             INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus, ChangedAt)
-            VALUES (@OrderId, @OldStatus, 'completed', GETDATE());
+            VALUES (@OrderId, @OldStatus, 'waiting', GETDATE());
         `);
 
         // 4. Gọi inventory
@@ -427,6 +427,7 @@ VALUES
         const rs = await pool.request().query(`
      SELECT 
         o.Id,
+        o.OrderNumber,
         o.Total,
         o.PaymentMethod,
         o.PaymentStatus,
