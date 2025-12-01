@@ -18,8 +18,8 @@ class OrderService {
     } = orderData;
     const paidOnline = Boolean(isOnlinePaid);
 
-    // Mặc định: nếu thanh toán online thì đơn vẫn chỉ "Pending" (chưa pha chế xong)
-    let finalStatus = "Pending";
+    // Mặc định: nếu thanh toán online thì đơn vẫn chỉ "pending" (chưa pha chế xong)
+    let finalStatus = "pending";
     let paymentStatus = paidOnline ? "Paid" : "Unpaid";
     let amountPaid = paidOnline ? total : 0;
     let changeAmount = 0;
@@ -125,19 +125,19 @@ await new sql.Request(transaction)
       }
 
 
-      // 3️⃣ Ghi vào lịch sử trạng thái (Pending)
-      // 3️⃣ Ghi vào lịch sử trạng thái ban đầu (Pending)
+      // 3️⃣ Ghi vào lịch sử trạng thái (pending)
+      // 3️⃣ Ghi vào lịch sử trạng thái ban đầu (pending)
       await new sql.Request(transaction)
         .input("OrderId", sql.Int, orderId)
         .input("OldStatus", sql.NVarChar(50), null)
-        .input("NewStatus", sql.NVarChar(50), finalStatus) // finalStatus = 'Pending'
+        .input("NewStatus", sql.NVarChar(50), finalStatus) // finalStatus = 'pending'
         .query(`
   UPDATE dbo.Orders
   SET Status = 'waiting'
   WHERE Id = @OrderId;
 
   INSERT INTO dbo.OrderHistory (OrderId, OldStatus, NewStatus)
-  VALUES (@OrderId, 'Pending', 'waiting');
+  VALUES (@OrderId, 'pending', 'waiting');
 `);
 
       // 🔄 AUTO ĐẨY ĐƠN DELIVERY SANG HÀNG ĐỢI PHA (waiting)
@@ -150,7 +150,7 @@ await new sql.Request(transaction)
             WHERE Id = @OrderId;
 
             INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus)
-            VALUES (@OrderId, 'Pending', 'waiting');
+            VALUES (@OrderId, 'pending', 'waiting');
           `);
       }
 
@@ -317,7 +317,7 @@ await new sql.Request(transaction)
       .input("OrderId", sql.Int, orderId)
       .input("UserId", sql.Int, userId)
       .query(`
-        UPDATE Orders SET Status=N'Cancelled'
+        UPDATE Orders SET Status=N'cancelled'
         WHERE Id=@OrderId AND UserId=@UserId
       `);
 
@@ -326,13 +326,13 @@ await new sql.Request(transaction)
       .request()
       .input("OrderId", sql.Int, orderId)
       .input("OldStatus", sql.NVarChar(50), oldStatus)
-      .input("NewStatus", sql.NVarChar(50), "Cancelled")
+      .input("NewStatus", sql.NVarChar(50), "cancelled")
       .query(`
         INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus)
         VALUES (@OrderId, @OldStatus, @NewStatus)
       `);
 
-    return { orderId, oldStatus, newStatus: "Cancelled" };
+    return { orderId, oldStatus, newStatus: "cancelled" };
   }
   // ======================================================
 // 🟢 Tạo đơn hàng cho POS (Cashier)

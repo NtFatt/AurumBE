@@ -99,9 +99,9 @@ class PosOrderService {
 
         try {
             await transaction.begin();
-const empRs = await new sql.Request(transaction)
-    .input("EmployeeId", sql.Int, user.id)
-    .query(`
+            const empRs = await new sql.Request(transaction)
+                .input("EmployeeId", sql.Int, user.id)
+                .query(`
         SELECT TOP 1 BranchId AS StoreId
         FROM Employees
         WHERE Id = @EmployeeId
@@ -118,7 +118,7 @@ const empRs = await new sql.Request(transaction)
             }
             // Insert Order (BỔ SUNG CÁC TRƯỜNG THIẾU)
             const orderResult = await new sql.Request(transaction)
-.input("EmployeeId", sql.Int, user.id)
+                .input("EmployeeId", sql.Int, user.id)
                 .input("UserId", sql.Int, user.id)
                 .input("StoreId", sql.Int, storeId)
                 .input("Status", sql.NVarChar, "pending")
@@ -296,31 +296,65 @@ VALUES
         return Array.from(map.values());
     }
 
-
     // =======================================
-    // 5. BARISTA — Update status
+    // 5. BARISTA — Update status (CÓ XỬ LÝ DELIVERY)
     // =======================================
     static async updateStatus(orderId, status) {
-        const valid = ["preparing", "done"];
-        if (!valid.includes(status)) throw new Error("Trạng thái không hợp lệ");
-
         const pool = await getPool();
 
+        // 1) Chỉ cho phép barista dùng preparing/done
+        const valid = ["preparing", "done"];
+        if (!valid.includes(status)) throw new Error("Trạng thái Barista không hợp lệ");
+
+        // 2) Lấy thông tin đơn hàng hiện tại
+        const rs = await pool.request()
+            .input("OrderId", sql.Int, orderId)
+            .query(`
+            SELECT Status, PaymentStatus, FulfillmentMethod
+            FROM Orders
+            WHERE Id = @OrderId
+        `);
+
+        if (rs.recordset.length === 0) {
+            throw new Error("Order không tồn tại");
+        }
+
+        const order = rs.recordset[0];
+        const oldStatus = (order.Status || "").toLowerCase();
+        const paymentStatus = (order.PaymentStatus || "").toLowerCase();
+        const fulfill = (order.FulfillmentMethod || "").toLowerCase();
+
+        let finalStatus = status; // mặc định → chuẩn POS
+
+        // 3) LOGIC MỚI:
+        // Nếu đơn Delivery và đã thanh toán → Barista hoàn tất = completed
+        if (status === "done" && fulfill === "delivery" && paymentStatus === "paid") {
+            finalStatus = "completed";
+        }
+
+        // 4) Update DB
         await pool.request()
             .input("OrderId", sql.Int, orderId)
-            .input("Status", sql.NVarChar, status)
+            .input("Status", sql.NVarChar, finalStatus)
             .query(`
-                DECLARE @OldStatus NVARCHAR(50);
-                SELECT @OldStatus = Status FROM Orders WHERE Id = @OrderId;
+            DECLARE @Old NVARCHAR(50);
+            SELECT @Old = Status FROM Orders WHERE Id = @OrderId;
 
-                UPDATE Orders SET Status = @Status WHERE Id = @OrderId;
+            UPDATE Orders SET Status = @Status WHERE Id = @OrderId;
 
-                INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus, ChangedAt)
-                VALUES (@OrderId, @OldStatus, @Status, GETDATE());
-            `);
+            INSERT INTO OrderHistory (OrderId, OldStatus, NewStatus, ChangedAt)
+            VALUES (@OrderId, @Old, @Status, GETDATE());
+        `);
 
-        return { message: "Cập nhật trạng thái thành công", orderId, status };
+        return {
+            message: "Cập nhật trạng thái thành công (Barista)",
+            orderId,
+            oldStatus,
+            newStatus: finalStatus,
+            autoCompleted: finalStatus === "completed"
+        };
     }
+
 
     // =======================================
     // 6. CASHIER — Thanh toán
